@@ -1,0 +1,31 @@
+/* Using VS Code CSS variables for automatic theming */
+
+/* vs code automatically converts internal theme to CSS Variables using --vscode- */
+body {
+    background-color: transparent;
+    color: var(--vscode-editor-foreground); /* Automatically matches user text color */
+    font-family: var(--vscode-editor-font-family); /* Matches user font choice */
+    font-size: var(--vscode-editor-font-size);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Explicitly styling based on the theme category classes VS Code adds to <body> */
+body.vscode-light {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+body.vscode-dark {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+body.vscode-high-contrast {
+    outline: 2px solid var(--vscode-contrastBorder); /* Essential for accessibility */
+}
+
+h1 {
+    color: var(--vscode-symbolIcon-keywordForeground);
+    margin-bottom: 20px;
+}

@@ -21,8 +21,30 @@
         "command": "catCoding.start",
         "title": "Start new Cat Coding session",
         "category": "Cat Coding"
+      },
+      {
+        "command": "catCoding.yarn",
+        "title": "Give Yarn 🧶",
+        "category": "Cat Coding"
+      },
+      {
+        "command": "catCoding.doRefactor",
+        "title": "Do Refactor",
+        "category": "Cat Coding"
       }
-    ]
+    ],
+    "menus": {
+      "webview/context": [
+        {
+          "command": "catCoding.yarn",
+          "when": "webviewId == 'catCoding'"
+        },
+        {
+          "command": "catCoding.doRefactor",
+          "when": "webviewId == 'catCoding'"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
