@@ -18,9 +18,9 @@ export function activate(context: vscode.ExtensionContext) {
   // This line of code will only be executed once when your extension is activated
   console.log('Congratulations, your extension "cat-coding" is now active!');
 
- 
- 
- 
+  // Register the serializer to handle restarts
+  vscode.window.registerWebviewPanelSerializer('catCoding', new CatCodingSerializer(context));
+
   // The command has been defined in the package.json file and even before implementing it here its available (throws error on calling it) but still visible in command pallete
   // Now provide the implementation of the command with registerCommand
   // The commandId parameter must match the command field in package.json
@@ -33,8 +33,6 @@ export function activate(context: vscode.ExtensionContext) {
     },
   );
 
-  
-  
   const refactorCommand = vscode.commands.registerCommand(
     "catCoding.doRefactor",
     () => {
@@ -65,7 +63,7 @@ export function activate(context: vscode.ExtensionContext) {
         // If it exists, just bring it to the front (reveal it)
         currentPanel.reveal(columnToShowIn);
       } else {
-        //cretae and show a new webview
+        // Create and show a new webview
         currentPanel = vscode.window.createWebviewPanel(
           "catCoding", // Identifies the type of the webview. Used internally
           "Cat Coding", // Title of the panel displayed to the user
@@ -78,87 +76,8 @@ export function activate(context: vscode.ExtensionContext) {
           },
         );
 
-        currentPanel.webview.onDidReceiveMessage(
-          (message) => {
-            if (message.command === "alert") {
-              vscode.window.showErrorMessage(message.text);
-            }
-          },
-          undefined,
-          context.subscriptions,
-        );
-
-        //vreate uri for local image path
-        const codingPath = vscode.Uri.joinPath(
-          context.extensionUri,
-          "media",
-          "coding.gif",
-        );
-        const compilingPath = vscode.Uri.joinPath(
-          context.extensionUri,
-          "media",
-          "compiling.gif",
-        );
-
-        //convert path to URI
-        const codingUri = currentPanel.webview.asWebviewUri(codingPath);
-        const compilingUri = currentPanel.webview.asWebviewUri(compilingPath);
-
-        //update the cats object with local URIs
-        cats["Coding Cat"] = codingUri.toString();
-        cats["Compiling Cat"] = compilingUri.toString();
-
-        const stylePath = vscode.Uri.joinPath(
-          context.extensionUri,
-          "media",
-          "style.css",
-        ); //provide path to local css file
-        const styleUri = currentPanel.webview.asWebviewUri(stylePath); //convert path to URI
-
-        // Set initial HTML content once
-        currentPanel.webview.html = getWebviewContent("Coding Cat", styleUri);
-
-        let iteration = 0;
-        const updateWebview = () => {
-          const cat = iteration++ % 2 ? "Compiling Cat" : "Coding Cat";
-          // Update the tab title dynamically
-          if (currentPanel) {
-            currentPanel.title = cat;
-            // Post message to update image instead of resetting HTML
-            currentPanel.webview.postMessage({
-              command: "changeGif",
-              src: cats[cat as keyof typeof cats]
-            });
-          }
-        };
-
-        //JS function to tells the extension to run our updateWebview function at regular intervals
-        const interval = setInterval(updateWebview, 5000); // Update every 5 seconds
-
-        // Update contents based on view state changes
-        currentPanel.onDidChangeViewState(
-          //event listener provided by webView api
-          (e) => {
-            const panel = e.webviewPanel; //the webview panel whose view state has changed
-            if (panel.visible) {
-              console.log("Cat is visible!");
-            }
-          },
-          null,
-          context.subscriptions,
-        );
-
-        // Clean up the interval when the panel is closed
-        currentPanel.onDidDispose(
-          () => {
-            //event listener provided by webView api
-            clearInterval(interval); //stops the timer . stops memory leak
-            // Reset the current panel reference
-            currentPanel = undefined;
-          },
-          null, //no special context
-          context.subscriptions, //a list of disposables to dispose when the extension is deactivated
-        );
+        // Setup the panel logic (listeners, interval, etc)
+        setupPanel(context, currentPanel);
       }
     },
   );
@@ -166,13 +85,91 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(disposable, refactorCommand, yarnCommand, startCatCoding);
 }
 
-// Helper function to generate the full HTML document
+// Helper function to setup listeners and content for both new and restored panels
+function setupPanel(context: vscode.ExtensionContext, panel: vscode.WebviewPanel) {
+  panel.webview.onDidReceiveMessage(
+    (message) => {
+      if (message.command === "alert") {
+        vscode.window.showErrorMessage(message.text);
+      }
+    },
+    undefined,
+    context.subscriptions,
+  );
 
-function getWebviewContent(cat: keyof typeof cats, styleUri: vscode.Uri) {
+  //vreate uri for local image path
+  const codingPath = vscode.Uri.joinPath(context.extensionUri, "media", "coding.gif");
+  const compilingPath = vscode.Uri.joinPath(context.extensionUri, "media", "compiling.gif");
+
+  //convert path to URI
+  const codingUri = panel.webview.asWebviewUri(codingPath);
+  const compilingUri = panel.webview.asWebviewUri(compilingPath);
+
+  //update the cats object with local URIs
+  cats["Coding Cat"] = codingUri.toString();
+  cats["Compiling Cat"] = compilingUri.toString();
+
+  const stylePath = vscode.Uri.joinPath(context.extensionUri, "media", "style.css");
+  const styleUri = panel.webview.asWebviewUri(stylePath);
+
+  // Set initial HTML content once
+  panel.webview.html = getWebviewContent("Coding Cat", styleUri, panel.webview);
+
+  let iteration = 0;
+  const updateWebview = () => {
+    const cat = iteration++ % 2 ? "Compiling Cat" : "Coding Cat";
+    panel.title = cat;
+    panel.webview.postMessage({
+      command: "changeGif",
+      src: cats[cat as keyof typeof cats]
+    });
+  };
+
+  const interval = setInterval(updateWebview, 5000);
+
+  panel.onDidChangeViewState(
+    (e) => {
+      if (e.webviewPanel.visible) {
+        console.log("Cat is visible!");
+      }
+    },
+    null,
+    context.subscriptions,
+  );
+
+  panel.onDidDispose(
+    () => {
+      clearInterval(interval);
+      currentPanel = undefined;
+    },
+    null,
+    context.subscriptions,
+  );
+}
+
+// The Serializer class that handles restoring the panel after VS Code restarts
+class CatCodingSerializer implements vscode.WebviewPanelSerializer {
+  constructor(private readonly context: vscode.ExtensionContext) {}
+
+  async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+    // VS Code has "remembered" this panel. We need to re-initialize it.
+    console.log(`Restoring Cat Coding with state: ${JSON.stringify(state)}`);
+    
+    // Set the global reference to this restored panel
+    currentPanel = webviewPanel;
+    
+    // Setup the restored panel (attach listeners, restore HTML)
+    setupPanel(this.context, currentPanel);
+  }
+}
+
+// Helper function to generate the full HTML document
+function getWebviewContent(cat: keyof typeof cats, styleUri: vscode.Uri, webview: vscode.Webview) {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; script-src 'unsafe-inline'; style-src ${webview.cspSource};">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="${styleUri}">
     <title>Cat Coding</title>
@@ -188,12 +185,17 @@ function getWebviewContent(cat: keyof typeof cats, styleUri: vscode.Uri) {
             const counter = document.getElementById('lines-of-code-counter');
             const yarnBin = document.getElementById('yarn-bin');
             const catImage = document.getElementById('cat-image');
-            let count = 0;
 
-            // 1. Automatic counter that reports "bugs" to the extension
-            //its a standard JS timer to create a repeated background task
+            // Restore state
+            const previousState = vscode.getState();
+            let count = previousState ? previousState.count : 0;
+            counter.textContent = count;
+
             setInterval(() => {
                 counter.textContent = count++;
+                // Save state
+                vscode.setState({ count: count });
+
                 if (Math.random() < 0.01 * count) {
                     vscode.postMessage({
                         command: 'alert',
@@ -202,13 +204,13 @@ function getWebviewContent(cat: keyof typeof cats, styleUri: vscode.Uri) {
                 }
             }, 1000);
 
-            // 2. Listen for messages from the "Mainland" (Extension)
             window.addEventListener('message', event => {
                 const message = event.data;
                 switch (message.command) {
                     case 'refactor':
                         count = Math.ceil(count * 0.5);
                         counter.textContent = count;
+                        vscode.setState({ count: count });
                         break;
                     case 'giveYarn':
                         yarnBin.textContent += '🧶';

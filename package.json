@@ -9,7 +9,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onWebviewPanel:catCoding"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
