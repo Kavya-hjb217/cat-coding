@@ -48,8 +48,28 @@ export function activate(context: vscode.ExtensionContext) {
           "catCoding", // Identifies the type of the webview. Used internally
           "Cat Coding", // Title of the panel displayed to the user
           columnToShowIn || vscode.ViewColumn.One, // Tells VS Code to open the tab in the first editor group (the main area).
-          {}, // An options object. Currently empty, but can be used to enable scripts or retain state
+          {
+            localResourceRoots: [
+              vscode.Uri.joinPath(context.extensionUri, "media"),
+            ], // Restrict the webview to only load resources from these directories for security.
+          },
         );
+
+
+        
+
+        //vreate uri for local image path
+        const codingPath =vscode.Uri.joinPath(context.extensionUri, "media", "coding.gif");
+        const compilingPath =vscode.Uri.joinPath(context.extensionUri, "media", "compiling.gif");
+
+
+        //convert path to URI 
+        const codingUri = currentPanel.webview.asWebviewUri(codingPath);
+        const compilingUri = currentPanel.webview.asWebviewUri(compilingPath);
+
+        //update the cats object with local URIs
+        cats["Coding Cat"] = codingUri.toString();
+        cats["Compiling Cat"] = compilingUri.toString();
 
         let iteration = 0;
         const updateWebview = () => {
@@ -58,7 +78,9 @@ export function activate(context: vscode.ExtensionContext) {
           if (currentPanel) {
             currentPanel.title = cat;
             // Set the HTML content
-            currentPanel.webview.html = getWebviewContent(cat as keyof typeof cats); //Changing the type of string changes the key of cats and thus gif being displayed, so we need to typecast it to the keys of cats object
+            currentPanel.webview.html = getWebviewContent(
+              cat as keyof typeof cats,
+            ); //Changing the type of string changes the key of cats and thus gif being displayed, so we need to typecast it to the keys of cats object
           }
         };
         updateWebview();
@@ -67,15 +89,16 @@ export function activate(context: vscode.ExtensionContext) {
         const interval = setInterval(updateWebview, 5000); // Update every 5 seconds
 
         // Update contents based on view state changes
-        currentPanel.onDidChangeViewState(//event listener provided by webView api
-          e => {
-            const panel = e.webviewPanel;//the webview panel whose view state has changed
+        currentPanel.onDidChangeViewState(
+          //event listener provided by webView api
+          (e) => {
+            const panel = e.webviewPanel; //the webview panel whose view state has changed
             if (panel.visible) {
               console.log("Cat is visible!");
             }
           },
           null,
-          context.subscriptions
+          context.subscriptions,
         );
 
         // Clean up the interval when the panel is closed
@@ -97,6 +120,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // Helper function to generate the full HTML document
+
+
 function getWebviewContent(cat: keyof typeof cats) {
   return `<!DOCTYPE html>
 <html lang="en">
