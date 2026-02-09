@@ -2,13 +2,14 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 
-//store gifs and their URL 
+//store gifs and their URL
 const cats = {
   "Coding Cat": "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif",
   "Compiling Cat": "https://media.giphy.com/media/mlvseq9yvZhba/giphy.gif",
 };
 
-
+//for singleton pattern to ensure only one webview panel is open at a time
+let currentPanel: vscode.WebviewPanel | undefined = undefined;
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
@@ -33,37 +34,63 @@ export function activate(context: vscode.ExtensionContext) {
   const startCatCoding = vscode.commands.registerCommand(
     "catCoding.start",
     () => {
-      //cretae and show a new webview
-      const panel = vscode.window.createWebviewPanel(
-        "catCoding", // Identifies the type of the webview. Used internally
-        "Cat Coding", // Title of the panel displayed to the user
-        vscode.ViewColumn.One, // Tells VS Code to open the tab in the first editor group (the main area).
-        {}, // An options object. Currently empty, but can be used to enable scripts or retain state
-      );
+      // A. Determine which column to show the webview in
+      const columnToShowIn = vscode.window.activeTextEditor
+        ? vscode.window.activeTextEditor.viewColumn
+        : undefined;
 
-      let iteration = 0;
-      const updateWebview = () => {
-        const cat = iteration++ % 2 ? "Compiling Cat" : "Coding Cat";
-        // Update the tab title dynamically
-        panel.title = cat;
-        // Set the HTML content
-        panel.webview.html = getWebviewContent(cat as keyof typeof cats);//Changing the type of string changes the key of cats and thus gif being displayed, so we need to typecast it to the keys of cats object
-      };
-      updateWebview();
+      if (currentPanel) {
+        // If it exists, just bring it to the front (reveal it)
+        currentPanel.reveal(columnToShowIn);
+      } else {
+        //cretae and show a new webview
+        currentPanel = vscode.window.createWebviewPanel(
+          "catCoding", // Identifies the type of the webview. Used internally
+          "Cat Coding", // Title of the panel displayed to the user
+          columnToShowIn || vscode.ViewColumn.One, // Tells VS Code to open the tab in the first editor group (the main area).
+          {}, // An options object. Currently empty, but can be used to enable scripts or retain state
+        );
 
+        let iteration = 0;
+        const updateWebview = () => {
+          const cat = iteration++ % 2 ? "Compiling Cat" : "Coding Cat";
+          // Update the tab title dynamically
+          if (currentPanel) {
+            currentPanel.title = cat;
+            // Set the HTML content
+            currentPanel.webview.html = getWebviewContent(cat as keyof typeof cats); //Changing the type of string changes the key of cats and thus gif being displayed, so we need to typecast it to the keys of cats object
+          }
+        };
+        updateWebview();
 
-    //JS function to tells the extension to run our updateWebview function at regular intervals
-      const interval = setInterval(updateWebview, 5000); // Update every 5 seconds
+        //JS function to tells the extension to run our updateWebview function at regular intervals
+        const interval = setInterval(updateWebview, 5000); // Update every 5 seconds
 
+        // Update contents based on view state changes
+        currentPanel.onDidChangeViewState(//event listener provided by webView api
+          e => {
+            const panel = e.webviewPanel;//the webview panel whose view state has changed
+            if (panel.visible) {
+              console.log("Cat is visible!");
+            }
+          },
+          null,
+          context.subscriptions
+        );
 
-	  // Clean up the interval when the panel is closed
-	  panel.onDidDispose(() => {//event listener provided by webView api
-		clearInterval(interval);//stops the timer . stops memory leak 
+        // Clean up the interval when the panel is closed
+        currentPanel.onDidDispose(
+          () => {
+            //event listener provided by webView api
+            clearInterval(interval); //stops the timer . stops memory leak
+            // Reset the current panel reference
+            currentPanel = undefined;
+          },
+          null, //no special context
+          context.subscriptions, //a list of disposables to dispose when the extension is deactivated
+        );
+      }
     },
-	null,//no special context
-	context.subscriptions,//a list of disposables to dispose when the extension is deactivated
-	  );
-	}
   );
 
   context.subscriptions.push(disposable, startCatCoding);
@@ -83,7 +110,6 @@ function getWebviewContent(cat: keyof typeof cats) {
 </body>
 </html>`;
 }
-
 
 // This method is called when your extension is deactivated
 export function deactivate() {}
