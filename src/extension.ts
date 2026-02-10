@@ -73,6 +73,9 @@ export function activate(context: vscode.ExtensionContext) {
             localResourceRoots: [
               vscode.Uri.joinPath(context.extensionUri, "media"),
             ], // Restrict the webview to only load resources from these directories for security.
+
+            // retainContextWhenHidden: true,
+           // Keep the webview's context alive even when it's not visible. This means the state and scripts will continue running in the background, allowing for faster reveal and state preservation.
           },
         );
 
